@@ -30,7 +30,9 @@ const dataTabs = [
   ...manualTabs.map((item) => ({ ...item, group: 'manual' }))
 ]
 
-const supportedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png']
+const supportedExtensions = ['.pdf', '.doc', '.docx', '.png']
+const maxSingleFileSize = 20 * 1024 * 1024
+const maxBatchFileSize = 100 * 1024 * 1024
 
 const schemas = {
   health: [
@@ -94,6 +96,7 @@ export default function MvpDataAcquisitionCenter({ triggerNotification }) {
   const [editingManualId, setEditingManualId] = useState(null)
   const [editingManualTab, setEditingManualTab] = useState('health')
   const [batchState, setBatchState] = useState(null)
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false)
 
   const activeMeta = dataTabs.find((item) => item.key === activeTab) || dataTabs[0]
   const workerQuery = queries[activeTab] || {}
@@ -129,21 +132,30 @@ export default function MvpDataAcquisitionCenter({ triggerNotification }) {
     setBatchState((prev) => {
       if (!prev) return prev
       const existingNames = new Set(prev.files.map((item) => item.name))
-      const nextFiles = incoming.filter((file) => {
+      let queuedSize = prev.files.filter((item) => item.status !== 'invalid').reduce((total, item) => total + (item.size || 0), 0)
+      const nextFiles = []
+      incoming.forEach((file, index) => {
         if (existingNames.has(file.name)) {
           triggerNotification(`已忽略重复文件：${file.name}`, 'warning')
-          return false
+          return
         }
         existingNames.add(file.name)
-        return true
-      }).map((file, index) => ({
-        id: `${Date.now()}-${index}-${file.name}`,
-        name: file.name,
-        size: file.size,
-        file,
-        status: isSupportedFile(file.name) ? 'ready' : 'invalid',
-        error: isSupportedFile(file.name) ? '' : '暂不支持该文件格式'
-      }))
+        let status = 'ready'
+        let error = ''
+        if (!isSupportedFile(file.name)) {
+          status = 'invalid'
+          error = '仅支持 PDF、Word、PNG'
+        } else if (file.size > maxSingleFileSize) {
+          status = 'invalid'
+          error = '单个文件不能超过20MB'
+        } else if (queuedSize + file.size > maxBatchFileSize) {
+          status = 'invalid'
+          error = '本批文件总大小不能超过100MB'
+        } else {
+          queuedSize += file.size
+        }
+        nextFiles.push({ id: `${Date.now()}-${index}-${file.name}`, name: file.name, size: file.size, file, status, error })
+      })
       return { ...prev, status: prev.status === 'completed' ? 'idle' : prev.status, results: prev.status === 'completed' ? [] : prev.results, files: [...prev.files, ...nextFiles] }
     })
   }
@@ -157,8 +169,10 @@ export default function MvpDataAcquisitionCenter({ triggerNotification }) {
     }
     setBatchState((prev) => ({ ...prev, status: 'recognizing', files: prev.files.map((item) => item.status === 'ready' ? { ...item, status: 'recognizing' } : item) }))
     window.setTimeout(() => {
+      const namedFailureIndex = readyFiles.findIndex((file) => file.name.includes('失败'))
+      const simulatedFailureIndex = readyFiles.length > 1 ? (namedFailureIndex >= 0 ? namedFailureIndex : readyFiles.length - 1) : namedFailureIndex
       const created = readyFiles.reduce((records, file, index) => {
-        if (file.name.includes('失败')) return records
+        if (index === simulatedFailureIndex) return records
         const matchedWorker = matchWorkerByFileName(file.name)
         const partial = file.name.includes('模糊') || file.name.includes('未匹配')
         records.push({
@@ -179,10 +193,6 @@ export default function MvpDataAcquisitionCenter({ triggerNotification }) {
         })
         return records
       }, [])
-      setManualData((prev) => ({
-        ...prev,
-        [batchState.tab]: [...created, ...prev[batchState.tab]]
-      }))
       setBatchState((prev) => ({
         ...prev,
         status: 'completed',
@@ -194,8 +204,26 @@ export default function MvpDataAcquisitionCenter({ triggerNotification }) {
           return item
         })
       }))
-      triggerNotification(`批量识别完成，${created.length} 条结果已进入待确认`)
+      triggerNotification(`批量识别完成，请点击“完成”确认写入台账`)
     }, 900)
+  }
+
+  const openBatchCompletionConfirm = () => {
+    if (batchState?.status === 'completed') setBatchConfirmOpen(true)
+  }
+
+  const confirmBatchCompletion = () => {
+    if (!batchState) return
+    const { tab, results } = batchState
+    setManualData((prev) => ({ ...prev, [tab]: [...results, ...prev[tab]] }))
+    setBatchConfirmOpen(false)
+    setBatchState(null)
+    triggerNotification(`${results.length} 条识别结果已生成待确认数据`)
+  }
+
+  const closeBatchUpload = () => {
+    setBatchConfirmOpen(false)
+    setBatchState(null)
   }
 
   const confirmReview = (record) => {
@@ -304,7 +332,8 @@ export default function MvpDataAcquisitionCenter({ triggerNotification }) {
 
       {previewAttachment && <AttachmentPreviewModal attachment={previewAttachment} onClose={() => setPreviewAttachment(null)} />}
       {reviewRecord && <ReviewModal record={reviewRecord} onChange={setReviewRecord} onClose={() => setReviewRecord(null)} onConfirm={confirmReview} />}
-      {batchState && <AiBatchDrawer state={batchState} onClose={() => setBatchState(null)} onAddFiles={addBatchFiles} onStart={startBatchRecognition} onRemoveFile={(id) => setBatchState((prev) => ({ ...prev, files: prev.files.filter((item) => item.id !== id) }))} />}
+      {batchState && <AiBatchDrawer state={batchState} onClose={closeBatchUpload} onAddFiles={addBatchFiles} onStart={startBatchRecognition} onComplete={openBatchCompletionConfirm} onRemoveFile={(id) => setBatchState((prev) => ({ ...prev, files: prev.files.filter((item) => item.id !== id) }))} />}
+      {batchConfirmOpen && batchState && <BatchCompletionModal state={batchState} onClose={() => setBatchConfirmOpen(false)} onConfirm={confirmBatchCompletion} />}
     </div>
   )
 }
@@ -313,20 +342,31 @@ function UnderlineTab({ active, onClick, children }) {
   return <button type="button" onClick={onClick} className={`relative min-h-[48px] whitespace-nowrap border-b-2 px-4 py-3 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${active ? 'border-primary font-medium text-primary' : 'border-transparent text-text-dark hover:border-primary/30 hover:text-primary'}`}>{children}</button>
 }
 
-function AiBatchDrawer({ state, onClose, onAddFiles, onStart, onRemoveFile }) {
+function AiBatchDrawer({ state, onClose, onAddFiles, onStart, onComplete, onRemoveFile }) {
   const canStart = state.files.some((item) => item.status === 'ready')
   const isRecognizing = state.status === 'recognizing'
-  const successCount = state.files.filter((item) => item.status === 'success' || item.status === 'partial').length
-  const failedCount = state.files.filter((item) => item.status === 'failed' || item.status === 'invalid').length
+  const successFiles = state.files.filter((item) => item.status === 'success' || item.status === 'partial')
+  const failedFiles = state.files.filter((item) => item.status === 'failed' || item.status === 'invalid')
 
   return <Drawer title={`AI智能采集-${state.type}`} onClose={isRecognizing ? undefined : onClose} width="860px">
-    <div className="rounded border border-primary/30 bg-[#F6FAFF] p-3 text-sm"><div className="font-medium text-text-dark">当前识别类型：{state.type}</div><div className="mt-1 text-text-secondary">本批附件将按当前页签类型识别，识别成功后自动进入待确认数据。</div></div>
-    {(state.status === 'idle' || state.status === 'completed') && <label className="block cursor-pointer rounded border border-dashed border-primary bg-[#F6FAFF] p-8 text-center hover:bg-[#EFF7FF]"><Upload className="mx-auto mb-3 h-10 w-10 text-primary" /><div className="text-base font-semibold">拖拽或选择多个附件</div><div className="mt-2 text-sm text-text-secondary">支持 PDF、Word、JPG、PNG；可批量上传当前类型资料</div><span className="mt-5 inline-flex rounded bg-primary px-4 py-2 text-white">选择文件</span><input type="file" multiple accept={supportedExtensions.join(',')} className="hidden" onChange={(event) => onAddFiles(event.target.files)} /></label>}
-    {state.files.length > 0 && <div className="rounded border border-border-gray"><div className="flex items-center justify-between border-b border-border-gray px-4 py-3"><div className="font-medium">文件队列（{state.files.length}）</div>{state.status === 'completed' && <div className="text-sm text-text-secondary">成功 {successCount} 条，失败 {failedCount} 条</div>}</div><div className="divide-y divide-border-gray">{state.files.map((file) => <div key={file.id} className="flex items-center gap-3 px-4 py-3 text-sm"><div className="min-w-0 flex-1"><div className="truncate font-medium">{file.name}</div><div className="mt-1 text-xs text-text-secondary">{formatFileSize(file.size)}</div></div><BatchFileStatus status={file.status} error={file.error} warning={file.warning} />{(file.status === 'ready' || file.status === 'invalid') && <button className="text-danger-red" onClick={() => onRemoveFile(file.id)} aria-label={`移除${file.name}`}><X className="h-4 w-4" /></button>}</div>)}</div></div>}
+    <div className="rounded border border-primary/30 bg-[#F6FAFF] p-3 text-sm"><div className="font-medium text-text-dark">当前识别类型：{state.type}</div></div>
+    {(state.status === 'idle' || state.status === 'completed') && <label className="block cursor-pointer rounded border border-dashed border-primary bg-[#F6FAFF] p-4 text-center hover:bg-[#EFF7FF]"><div className="text-base font-semibold">拖拽或选择多个附件</div><div className="mt-1 text-sm text-text-secondary">支持 PDF、Word、PNG；单个文件不超过20MB，总文件大小不超过100MB</div><span className="mt-3 inline-flex rounded bg-primary px-4 py-2 text-white">选择文件</span><input type="file" multiple accept={supportedExtensions.join(',')} className="hidden" onChange={(event) => onAddFiles(event.target.files)} /></label>}
+    {state.status !== 'completed' && state.files.length > 0 && <div className="rounded border border-border-gray"><div className="border-b border-border-gray px-4 py-3 font-medium">文件队列（{state.files.length}）</div><div className="divide-y divide-border-gray">{state.files.map((file) => <div key={file.id} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm"><div className="min-w-0 flex-1 truncate font-medium" title={file.name}>{file.name}</div><span className="shrink-0 text-xs text-text-secondary">{formatFileSize(file.size)}</span><BatchFileStatus status={file.status} error={file.error} warning={file.warning} />{(file.status === 'ready' || file.status === 'invalid') && <button className="shrink-0 text-danger-red" onClick={() => onRemoveFile(file.id)} aria-label={`移除${file.name}`}><X className="h-4 w-4" /></button>}</div>)}</div></div>}
     {state.status === 'recognizing' && <div className="flex items-center gap-3 rounded bg-[#F6FAFF] p-4 text-sm text-primary"><LoaderCircle className="h-5 w-5 animate-spin" />正在执行批量识别，请稍候……</div>}
-    {state.status === 'completed' && <div className="rounded border border-success-green/30 bg-[#F6FFED] p-4 text-sm"><div className="font-medium text-success-green">批量识别完成</div><div className="mt-1 text-text-secondary">成功和部分识别的文件已自动生成待确认数据，失败文件可重新上传处理。</div>{state.results.length > 0 && <div className="mt-3 space-y-2">{state.results.map((item) => <div key={item.id} className="flex items-center justify-between rounded bg-white p-2"><span>{item.file}</span><Badge tone={item.warning ? 'orange' : 'blue'}>{item.warning ? '需重点核对' : '待确认'}</Badge></div>)}</div>}</div>}
-    <div className="flex justify-end gap-2">{!isRecognizing && state.status !== 'completed' && <button className="rounded border border-border-gray px-4 py-2" onClick={onClose}>取消</button>}{state.status !== 'completed' && <button className="rounded bg-primary px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canStart || isRecognizing} onClick={onStart}>{isRecognizing ? '识别中…' : '开始识别'}</button>}{state.status === 'completed' && <button className="rounded bg-primary px-4 py-2 text-white" onClick={onClose}>完成</button>}</div>
+    {state.status === 'completed' && <div className="grid gap-3 md:grid-cols-2"><BatchResultCard title="识别失败" files={failedFiles} tone="red" /><BatchResultCard title="识别成功" files={successFiles} tone="green" /></div>}
+    <div className="flex justify-end gap-2">{!isRecognizing && state.status !== 'completed' && <button className="rounded border border-border-gray px-4 py-2" onClick={onClose}>取消</button>}{state.status !== 'completed' && <button className="rounded bg-primary px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={!canStart || isRecognizing} onClick={onStart}>{isRecognizing ? '识别中…' : '开始识别'}</button>}{state.status === 'completed' && <button className="rounded bg-primary px-4 py-2 text-white" onClick={onComplete}>完成</button>}</div>
   </Drawer>
+}
+
+function BatchResultCard({ title, files, tone }) {
+  const isSuccess = tone === 'green'
+  return <div className={`overflow-hidden rounded border ${isSuccess ? 'border-success-green/30' : 'border-danger-red/30'}`}><div className={`flex items-center justify-between px-4 py-3 font-medium ${isSuccess ? 'bg-[#F6FFED] text-success-green' : 'bg-[#FFF1F0] text-danger-red'}`}><span>{title}</span><Badge tone={isSuccess ? 'green' : 'red'}>{files.length}</Badge></div>{files.length > 0 ? <div className="divide-y divide-border-gray">{files.map((file) => <div key={file.id} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm"><span className="min-w-0 flex-1 truncate" title={file.name}>{file.name}</span><Badge tone={isSuccess && file.status === 'partial' ? 'orange' : isSuccess ? 'green' : 'red'}>{isSuccess ? (file.status === 'partial' ? '需重点核对' : '识别成功') : (file.error || '识别失败')}</Badge></div>)}</div> : <div className="px-4 py-6 text-center text-sm text-text-secondary">-</div>}</div>
+}
+
+function BatchCompletionModal({ state, onClose, onConfirm }) {
+  const successCount = state.files.filter((item) => item.status === 'success' || item.status === 'partial').length
+  const failedCount = state.files.filter((item) => item.status === 'failed' || item.status === 'invalid').length
+  return <CenterModal title="确认识别结果" onClose={onClose} width="520px" footer={<><button className="rounded border border-border-gray px-4 py-2" onClick={onClose}>取消</button><button className="rounded bg-primary px-4 py-2 text-white" onClick={onConfirm}>确认</button></>}><div className="space-y-4 p-5"><div className="text-sm leading-6 text-text-dark">成功识别的文件将自动生成待确认数据，失败文件可以重新上传处理或者手动录入。</div><div className="flex gap-5 text-sm text-text-secondary"><span>识别成功：{successCount} 个</span><span>识别失败：{failedCount} 个</span></div></div></CenterModal>
 }
 
 function BatchFileStatus({ status, error, warning }) {
