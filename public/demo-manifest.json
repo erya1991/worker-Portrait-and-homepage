@@ -1,0 +1,9 @@
+{
+  "name": "工人智能评价平台（MVP）",
+  "description": "面向施工现场工人的评价与画像前端原型，覆盖企业及项目数据看板、数据采集、指标评分、模型执行、标签生成和工人画像，形成可演示的最小业务闭环；当前页面使用浏览器内存 Mock 数据。",
+  "type": "前端业务原型（MVP）",
+  "tech": "React 19 + Vite 8 + Tailwind CSS 4 + lucide-react + JavaScript（ES Modules）",
+  "url": "https://pm-demo.cn/worker-portrait/",
+  "updateTime": "2026-08-18",
+  "status": "已发布"
+}

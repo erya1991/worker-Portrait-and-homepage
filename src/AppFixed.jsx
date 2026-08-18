@@ -17,11 +17,17 @@ const menus = [
 export default function AppFixed() {
   const [activeMenu, setActiveMenu] = useState('dashboard')
   const [dashboardProjectId, setDashboardProjectId] = useState('P001')
+  const [workerPoolFilter, setWorkerPoolFilter] = useState({ tag: '全部', version: 0 })
   const [notifications, setNotifications] = useState([])
 
   const openProjectFromEnterprise = (projectId) => {
     setDashboardProjectId(projectId)
     setActiveMenu('dashboard')
+  }
+
+  const openWorkerPoolFromEnterprise = (tag = '全部') => {
+    setWorkerPoolFilter({ tag, version: Date.now() })
+    setActiveMenu('portrait')
   }
 
   const triggerNotification = (message, type = 'success') => {
@@ -81,7 +87,10 @@ export default function AppFixed() {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setActiveMenu(item.key)}
+                onClick={() => {
+                  if (item.key === 'portrait') setWorkerPoolFilter({ tag: '全部', version: Date.now() })
+                  setActiveMenu(item.key)
+                }}
                 className={`flex w-full items-center gap-3 border-r-3 px-5 py-3 text-left text-[13px] transition ${
                   active
                     ? 'border-r-primary bg-[#E6F7FF] font-bold text-primary'
@@ -121,6 +130,8 @@ export default function AppFixed() {
             onNavigate={setActiveMenu}
             projectId={activeMenu === 'dashboard' ? dashboardProjectId : undefined}
             onOpenProject={activeMenu === 'enterprise-dashboard' ? openProjectFromEnterprise : undefined}
+            workerPoolFilter={activeMenu === 'portrait' ? workerPoolFilter : undefined}
+            onOpenWorkerPool={activeMenu === 'enterprise-dashboard' ? openWorkerPoolFromEnterprise : undefined}
           />
         </main>
       </section>

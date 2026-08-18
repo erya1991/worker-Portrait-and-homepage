@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Award, Briefcase, Calendar, FileText, Search, ShieldCheck, Sparkles, Users } from 'lucide-react'
 import { Badge, Grade, Stars, Stat, Tab } from './mvpShared'
 
@@ -113,12 +113,21 @@ const factTabs = [
   { key: 'laborDispute', label: '劳资纠纷' }
 ]
 
-export default function MvpPortraitCenter() {
+export default function MvpPortraitCenter({ workerPoolFilter }) {
   const [keyword, setKeyword] = useState('')
   const [gradeFilter, setGradeFilter] = useState('全部')
   const [tagFilter, setTagFilter] = useState('全部')
   const [selectedId, setSelectedId] = useState(1)
   const [factTab, setFactTab] = useState('health')
+
+  useEffect(() => {
+    const tag = workerPoolFilter?.tag || '全部'
+    const matchedWorker = tag === '全部' ? workers[0] : workers.find((item) => item.tags.includes(tag)) || workers[0]
+    setKeyword('')
+    setGradeFilter('全部')
+    setTagFilter(tag)
+    setSelectedId(matchedWorker.id)
+  }, [workerPoolFilter?.tag, workerPoolFilter?.version])
 
   const allTags = ['全部', ...new Set(workers.flatMap((item) => item.tags))]
   const filteredWorkers = useMemo(() => {
