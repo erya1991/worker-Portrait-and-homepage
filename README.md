@@ -8,6 +8,7 @@
 
 | 模块 | 已实现能力 |
 | --- | --- |
+| 企业数据看板 | 独立企业级只读页面；支持全公司及分公司组织下拉，展示 7 项企业 KPI、项目运行情况对比、出勤率/合同签署率最低 3 个项目、提醒样式、企业工人库左侧 A/B/C/D 环形图与右侧 2×2 标签卡、近 7 日/近 15 日用工趋势；项目名称可穿透到现有项目首页。企业数据使用后端聚合形态的 Mock。 |
 | 首页看板 | 默认入口；单屏只读展示在场人员、考勤、合同、AI 识别、评价与工人库统计，仅支持项目选择；使用可切换的 Mock 项目数据。 |
 | 数据采集中心 | 十个平级业务页签查看实名制数据和五类业务台账；五类业务记录支持 AI 批量附件识别；识别结果在点击“完成”并确认后进入对应台账并标记“待确认”，通过快捷筛选和左右对照弹窗完成核对确认；手动新增记录标记为“无需确认”。 |
 | 工人评价模型 | 在一个菜单内完成评价维度、维度权重、指标管理、等级配置、标签分类、标签管理、模型执行和执行记录；支持四类评分规则，以及标签 `AND` / `OR` 规则配置。 |
@@ -104,11 +105,12 @@ npm.cmd run preview
 ```text
 src/
 ├─ main.jsx                         # 实际入口：加载 AppFixed.jsx
-├─ AppFixed.jsx                     # 当前可运行的应用外壳、四项左侧菜单与消息提示
+├─ AppFixed.jsx                     # 当前可运行的应用外壳、五项左侧菜单与项目穿透状态
 ├─ App.jsx                          # 保留的旧外壳文件，不作为当前入口
 ├─ index.css                        # 全局样式与 Tailwind 配置
 └─ pages/
-   ├─ HomeDashboard.jsx             # 首页看板：固定单屏的只读统计总览
+   ├─ EnterpriseDashboard.jsx       # 企业数据看板：企业范围多项目汇总与穿透入口
+   ├─ HomeDashboard.jsx             # 首页看板：固定单屏的项目级只读统计总览
    ├─ MvpDataAcquisitionCenter.jsx  # 数据采集中心
    ├─ MvpIndexCenter.jsx            # 工人评价模型：统一页签入口
    ├─ MvpModelCenter.jsx            # 权重、等级、执行与记录的复用内容
@@ -116,8 +118,13 @@ src/
    ├─ MvpPortraitCenter.jsx         # 工人画像与工人库
    └─ mvpShared.jsx                 # 通用表格、抽屉、表单、模拟工人等共享内容
 ├─ mock/
-   └─ dashboard.js                  # 首页看板的项目级 Mock 聚合数据
+   ├─ dashboard.js                  # 首页看板的项目级 Mock 聚合数据
+   └─ enterpriseDashboard.js        # 企业看板的企业级聚合 Mock 数据
+└─ api/
+   └─ enterpriseDashboard.js        # 企业看板 Mock/真实接口 adapter
 ```
+
+企业数据看板不在浏览器端把 P001、P002 等项目快照相加。企业 KPI、项目比较、重点关注最低项目、企业标签/等级和趋势数据均由 `src/mock/enterpriseDashboard.js` 模拟后端已聚合的结果，页面通过 `src/api/enterpriseDashboard.js` 访问。
 
 ## 前后端对接建议
 
@@ -145,6 +152,8 @@ src/
 
 首页看板当前采用响应式单屏网格：中部人员与考勤卡片约占三分之二宽度，AI 识别卡片约占三分之一，为较长班组名称预留图例空间，班组图例同一行显示人数与占比；考勤卡片右侧的“今日考勤数据”和“在场班组分布”采用紧凑间距，保持在固定卡片范围内；底部仅保留合同统计和工人评价统计两张卡片，分别展示合同状态/完成签署趋势和 A-D 实心饼图/五维评分，A级占比指标补充 A 级人数说明；在低高度窗口下自动压缩统计区间距，不启用页面纵向滚动。首页仅保留项目选择，统计周期固定为今日，不提供手动刷新。
 
+企业数据看板使用独立的 `enterprise-dashboard` 菜单，顶部通过组织下拉选择全公司或分公司，第一排固定 7 张 KPI，主屏最多展示 5 个项目，项目对比不展示数据状态字段并提供全部项目弹窗；第二排项目对比约占 3/4 宽度，重点关注约占 1/4，主表使用适度字号和行高完整填充 5 行内容。重点关注只显示出勤率最低 3 项和合同签署率最低 3 项，使用红/橙色提醒卡和警示图标，不显示提醒数量或额外提示文字，指标数字放在前面，项目名称右对齐并为蓝色可点击整行穿透，不显示序号和查看按钮；企业工人库左侧展示正式评价 A/B/C/D 环形图并在色块中标注等级，右侧以 2×2 卡片展示动态标签人数，卡片高度与企业用工趋势统一，不展示当前在场、历史工人和累计合作工人；企业用工趋势使用 React + SVG 实现参考 ECharts 的企业数据图表视觉：独立浅灰画布、弱网格、双 Y 轴、渐变蓝色柱、紫色折线、日期、悬浮十字线和 Tooltip，支持底部图例切换单独查看人数柱状图或出勤率折线图；不常驻展示人数或出勤率数字，所有具体指标通过悬浮 Tooltip 统一查看；底部不保留更新时间行，不建设合同、评价、AI 运行摘要大卡片。
+
 数据采集中心当前采用横向底部线条 Tab 样式：十个业务页签平级展示，五类业务记录页签的按钮和查询分行展示，各自提供“AI智能采集”按钮；列表支持勾选“仅看待确认”筛选、附件点击预览和左右对照确认弹窗，不新增左侧菜单或路由。AI 上传 Mock 支持 PDF、Word、PNG，单文件不超过 20MB、批次总大小不超过 100MB；识别结果先在上传抽屉中暂存，点击“完成”并确认后才写入对应台账；批量上传多个文件时会模拟 1 个识别失败文件，便于演示失败处理流程。刷新页面后恢复初始数据。
 
 ## 验收建议
@@ -155,13 +164,15 @@ src/
 4. 将模型维度权重调整为合计 100%，执行一次指定项目评价，检查批次记录、评分结果及标签执行结果。
 5. 新增一条含多条件 `AND` 或 `OR` 的标签规则，在标签管理和工人画像中核对展示结果。
 6. 从工人库进入画像详情，检查五维雷达、综合评价、履历和五类台账是否完整展示。
-7. 打开首页看板并切换项目，检查人员、考勤、合同、AI 和评价统计同步变化；确认趋势图显示日期与具体数量，评价区域仅展示 A-D 等级；在 1440 × 900 与 1280 × 760 下确认首页内容区不出现纵向滚动条。
+7. 打开企业数据看板，检查组织下拉、7 张 KPI、5 行项目对比、全部项目弹窗、重点关注红橙提醒卡、企业工人库等级标注和近 7 日/近 15 日趋势 Tooltip；点击项目表和重点关注任意项目行检查是否穿透到项目首页并自动选中项目。再检查首页项目切换、趋势图和 A-D 等级；在 1440 × 900 与 1280 × 760 下确认两个看板内容区不出现纵向滚动条。
 
 ## Latest adjustments
 
 - The tag category tab is removed from the Worker Evaluation Model page.
 - Tag categories are now maintained as a static dictionary.
 - Tag management create/edit forms use the static tag category dictionary.
+- Enterprise trend chart uses an approximately 4.8:1 proportional SVG canvas so the plotting area fills the trend card horizontally without stretching its axes or labels.
+- The enterprise trend X-axis shows every available date for both the 7-day and 15-day views; detailed values remain hover-only.
 
 ## Latest adjustments
 

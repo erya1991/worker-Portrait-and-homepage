@@ -179,3 +179,154 @@ body {
 .b-table tr:hover td {
   background-color: #E6F7FF;
 }
+
+/* Enterprise dashboard keeps the project dashboard visual language while using its own grid. */
+.enterprise-dashboard-layout {
+  grid-template-rows: 52px 104px minmax(0, 1.28fr) minmax(0, 1fr);
+}
+
+.enterprise-org-select {
+  min-width: 180px;
+}
+
+.enterprise-scope-badge {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid #D6E4FF;
+  border-radius: 999px;
+  background: #F6FAFF;
+  color: #1668DC;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.enterprise-table {
+  border-collapse: collapse;
+}
+
+.enterprise-table th {
+  background: #FAFAFA;
+  border-bottom: 1px solid var(--color-border-gray);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 7px 8px;
+  white-space: nowrap;
+}
+
+.enterprise-table td {
+  border-bottom: 1px solid #F0F0F0;
+  color: var(--color-text-dark);
+  font-size: 11px;
+  padding: 8px;
+  vertical-align: middle;
+}
+
+.enterprise-project-table th {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.enterprise-project-table td {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.enterprise-project-table tbody tr {
+  height: 44px;
+}
+
+.enterprise-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.enterprise-table tbody tr:hover td {
+  background: #F6FAFF;
+}
+
+.enterprise-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.enterprise-status-normal {
+  background: #F6FFED;
+  color: #389E0D;
+}
+
+.enterprise-status-delay {
+  background: #FFF7E6;
+  color: #D46B08;
+}
+
+.enterprise-status-missing {
+  background: #FFF1F0;
+  color: #CF1322;
+}
+
+.enterprise-project-drawer {
+  animation: enterprise-drawer-in 160ms ease-out;
+}
+
+.enterprise-dashboard-layout .fill-text-secondary {
+  fill: var(--color-text-secondary);
+}
+
+@keyframes enterprise-drawer-in {
+  from { transform: translateX(24px); opacity: 0.7; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@media (max-width: 1279px) {
+  .enterprise-dashboard-layout {
+    grid-template-rows: 52px 104px minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+
+  .enterprise-metric-card {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .enterprise-metric-card .text-\[21px\] {
+    font-size: 18px;
+  }
+
+  .enterprise-table th,
+  .enterprise-table td {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+}
+
+@media (max-height: 800px) {
+  .enterprise-dashboard-layout {
+    grid-template-rows: 46px 92px minmax(0, 1.25fr) minmax(0, 0.95fr);
+    gap: 8px;
+  }
+
+  .enterprise-dashboard-layout .enterprise-panel {
+    padding: 10px;
+  }
+
+  .enterprise-dashboard-layout .enterprise-panel-title {
+    margin-bottom: 6px;
+  }
+
+  .enterprise-dashboard-layout .enterprise-metric-card {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .enterprise-dashboard-layout .enterprise-tag-stat {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+}

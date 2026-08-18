@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, Camera, ClipboardCheck, FileSignature, Gauge, UsersRound } from 'lucide-react'
 import { dashboardProjects, getDashboardOverview } from '../mock/dashboard'
 
@@ -75,8 +75,11 @@ function ContractStatus({ contracts }) {
   return <div className="rounded bg-[#FBFCFE] p-2.5"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-medium">合同状态分布</span><span className="text-text-secondary">有效统计 {total} 份</span></div><div className="flex h-2.5 overflow-hidden rounded bg-[#EEF2F6]">{items.map((item) => <span key={item.label} style={{ width: `${item.value / total * 100}%`, backgroundColor: item.color }} />)}</div><div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-text-secondary">{items.map((item) => <div key={item.label} className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label} {item.value}</div>)}</div></div>
 }
 
-export default function HomeDashboard() {
-  const [projectId, setProjectId] = useState('P001')
+export default function HomeDashboard({ projectId: requestedProjectId = 'P001' }) {
+  const [projectId, setProjectId] = useState(requestedProjectId)
+  useEffect(() => {
+    setProjectId(requestedProjectId)
+  }, [requestedProjectId])
   const data = useMemo(() => getDashboardOverview(projectId), [projectId])
   const { overview, evaluation } = data
   const gradeTotal = evaluation.grades.reduce((total, item) => total + item.value, 0)

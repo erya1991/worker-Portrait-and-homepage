@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { AlertTriangle, Bell, CheckCircle2, Cpu, LayoutDashboard, Sliders, Users } from 'lucide-react'
+import { AlertTriangle, Bell, Building2, CheckCircle2, Cpu, LayoutDashboard, Sliders, Users } from 'lucide-react'
 import DataAcquisitionCenter from './pages/MvpDataAcquisitionCenter'
+import EnterpriseDashboard from './pages/EnterpriseDashboard'
 import IndexCenter from './pages/MvpIndexCenter'
 import PortraitCenter from './pages/MvpPortraitCenter'
 import HomeDashboard from './pages/HomeDashboard'
 
 const menus = [
+  { key: 'enterprise-dashboard', label: '企业数据看板', icon: Building2 },
   { key: 'dashboard', label: '首页看板', icon: LayoutDashboard },
   { key: 'acquisition', label: '数据采集中心', icon: Cpu },
   { key: 'index', label: '工人评价模型', icon: Sliders },
@@ -14,7 +16,13 @@ const menus = [
 
 export default function AppFixed() {
   const [activeMenu, setActiveMenu] = useState('dashboard')
+  const [dashboardProjectId, setDashboardProjectId] = useState('P001')
   const [notifications, setNotifications] = useState([])
+
+  const openProjectFromEnterprise = (projectId) => {
+    setDashboardProjectId(projectId)
+    setActiveMenu('dashboard')
+  }
 
   const triggerNotification = (message, type = 'success') => {
     const id = Date.now().toString()
@@ -25,6 +33,7 @@ export default function AppFixed() {
   }
 
   const ActivePage = {
+    'enterprise-dashboard': EnterpriseDashboard,
     dashboard: HomeDashboard,
     acquisition: DataAcquisitionCenter,
     index: IndexCenter,
@@ -106,8 +115,13 @@ export default function AppFixed() {
           </div>
         </header>
 
-        <main className={`min-h-0 flex-1 ${activeMenu === 'dashboard' ? 'overflow-hidden p-3' : 'overflow-auto p-6'}`}>
-          <ActivePage triggerNotification={triggerNotification} onNavigate={setActiveMenu} />
+        <main className={`min-h-0 flex-1 ${activeMenu === 'dashboard' || activeMenu === 'enterprise-dashboard' ? 'overflow-hidden p-3' : 'overflow-auto p-6'}`}>
+          <ActivePage
+            triggerNotification={triggerNotification}
+            onNavigate={setActiveMenu}
+            projectId={activeMenu === 'dashboard' ? dashboardProjectId : undefined}
+            onOpenProject={activeMenu === 'enterprise-dashboard' ? openProjectFromEnterprise : undefined}
+          />
         </main>
       </section>
     </div>
